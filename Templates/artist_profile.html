@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="artist-profile-page">
+    <h2>{{ artist.username }}</h2>
+
+    {% if current_user.is_authenticated and current_user.role == 'artist' and current_user.username == artist.username %}
+        <p>{{ subscriber_count }} fans in the Inner Circle</p>
+    {% endif %}
+
+    <p>Exclusive drops and previews from {{ artist.username }}.</p>
+    <div class="media-grid">
+        {% for item in artist.media %}
+            {% if item.filename %}
+                {% set has_access = current_user.is_authenticated and (
+                    (current_user.role == 'artist' and current_user.username == artist.username) or
+                    (current_user.email is defined and current_user.email.endswith('@drexel.edu')) or
+                    (artist._id|string in current_user.subscribed_artists)
+                ) %}
+
+                <div class="media-card">
+                    <div class="media-art">
+                        {% set artwork = item.artwork if item.artwork and item.artwork != '' else 'logo.png' %}
+                        <img 
+                            src="{{ url_for('uploaded_file', filename=artwork) }}"
+                            class="media-artwork {% if not has_access %}blurred-image{% endif %}">
+                    </div>
+
+                    <div class="media-info">
+                        <h3>{{ item.title }}</h3>
+                        <p>{{ item.description }}</p>
+
+                        {% if item.filename.endswith('.mp3') or item.filename.endswith('.wav') %}
+                            <audio {% if not has_access %}controls muted preload="none" class="blurred-audio"{% else %}controls{% endif %}>
+                                <source src="{{ url_for('uploaded_file', filename=item.filename) }}">
+                            </audio>
+                        {% elif item.filename.endswith('.mp4') %}
+                            <video width="100%" {% if not has_access %}muted controls class="blurred-video"{% else %}controls{% endif %}>
+                                <source src="{{ url_for('uploaded_file', filename=item.filename) }}">
+                            </video>
+                        {% endif %}
+
+                        <div class="like-comment-bar">
+                            {% set safe_id = item.filename|replace('.', '')|replace(' ', '_') %}
+<button
+    id="like-btn-{{ safe_id }}"
+    class="like-btn
+        {% if current_user.is_authenticated and item.likes is iterable and current_user.id in item.likes %}
+            liked
+        {% endif %}"
+    onclick="likeMedia('{{ artist._id }}', '{{ item.filename }}')"
+>
+    {% if current_user.is_authenticated and item.likes is iterable and current_user.id in item.likes %}
+        💔 Unlike
+    {% else %}
+        ❤️ Like
+    {% endif %}
+</button>
+<!-- Comments Section -->
+<div class="comments">
+    <form method="POST" action="{{ url_for('add_comment', artist_id=artist._id, filename=item.filename) }}">
+        <input type="text" name="comment_text" placeholder="Leave a comment..." required>
+        <button type="submit">Post</button>
+    </form>
+
+    <div class="comment-list">
+        {% for comment in item.comments | reverse %}
+            <div class="comment">
+                <strong>{{ comment.username }}</strong>: {{ comment.text }}
+                <span class="timestamp">{{ comment.timestamp }}</span>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+                        </div>
+                
+                        {% if not has_access %}
+                            <p class="locked">🔒 Subscribe or login with Drexel ID to access this content.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</section>
+
+{% if current_user.is_authenticated and current_user.username == artist.username %}
+<section class="upload-section">
+    <h3>Upload New Content</h3>
+    <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="upload-form">
+        <input type="text" name="title" placeholder="Title" required>
+        <textarea name="description" placeholder="Short description" required></textarea>
+        
+        <label>Main File (audio/video/image)</label>
+        <input type="file" name="file" accept="audio/*,video/*,image/*" required>
+
+        <label>Artwork (optional)</label>
+        <input type="file" name="artwork" accept="image/*">
+        
+        <button type="submit">Upload</button>
+    </form>
+</section>
+
+{% if current_user.is_authenticated and current_user.username == artist.username %}
+<section class="upload-section">
+    <h3>Upload New Content</h3>
+    <!-- form as before -->
+</section>
+
+<section class="upload-section">
+    <h3>Dashboard Insights</h3>
+    <p><strong>Total Uploads:</strong> {{ media_count }}</p>
+    <p><strong>Total Subscribers:</strong> {{ subscriber_count }}</p>
+    <p><strong>Last Upload:</strong> {{ last_upload.strftime('%b %d, %Y %I:%M %p') if last_upload else 'N/A' }}</p>
+</section>
+{% endif %}
+
+{% endif %}
+<script>
+    document.querySelectorAll('audio, video').forEach(player => {
+        player.addEventListener('play', () => {
+            const filename = player.querySelector('source').getAttribute('src').split('/').pop();
+            const artistId = "{{ artist._id }}";
+    
+            fetch(`/increment_play/${artistId}/${filename}`, {
+                method: 'POST'
+            });
+        }, { once: true }); // only trigger once per load
+    });
+    </script>
+ 
+<script>
+    function likeMedia(artistId, filename) {
+        const safeId = filename.replace(/\./g, '').replace(/ /g, '_');
+
+        fetch('/like', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ artist_id: artistId, filename: filename })
+        }).then(response => response.json()).then(data => {
+            if (data.success) {
+                const btn = document.getElementById('like-btn-' + safeId);
+                if (data.liked) {
+                    btn.textContent = '💔 Unlike';
+                    btn.classList.add('liked');
+                } else {
+                    btn.textContent = '❤️ Like';
+                    btn.classList.remove('liked');
+                }
+            }
+        });
+    }
+</script>
+
+{% endblock %}

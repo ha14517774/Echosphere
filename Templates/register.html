@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="form-container">
+    <h2>Get in the Circle</h2>
+    <form method="POST" action="{{ url_for('register') }}">
+        <input type="text" name="username" placeholder="Choose a Username" required>
+        <input type="email" name="email" placeholder="Email or enter drexel email for free access" required class="wider-input" required>
+        <input type="password" name="password" placeholder="Create a Password" required>
+        <button type="submit">Register</button>
+    </form>
+    <p>Already have an account? <a href="{{ url_for('login') }}">Sign In</a></p>
+</section>
+{% endblock %}

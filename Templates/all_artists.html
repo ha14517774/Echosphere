@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="all-artists-page">
+    <h2>Meet the Artists of Echosphere</h2>
+    <p>Connecting talent with the fans who truly support them.</p>
+
+    <div class="artist-grid">
+        {% for artist in artists %}
+            <div class="artist-card">
+                <img class="profile-pic" src="{{ url_for('uploaded_file', filename=artist.profile_pic) if artist.profile_pic else url_for('static', filename='images/logo.png') }}" alt="{{ artist.username }}">
+                <h3>{{ artist.username }}</h3>
+                <a href="{{ url_for('artist_profile', artist_id=artist._id) }}">View Profile</a>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+<section class="artist-grid">
+    <div class="artist-card">
+        <img class="profile-pic" src="{{ url_for('static', filename='images/allen.png') }}" alt="Allen Voyce">
+        <h3>Allen Voyce</h3>
+        <p>Genre: Alt Rock</p>
+    </div>
+
+    <div class="artist-card">
+        <img class="profile-pic" src="{{ url_for('static', filename='images/nicolm.png') }}" alt="Nicolm">
+        <h3>Nicolm</h3>
+        <p>Genre: Indie Pop</p>
+    </div>
+</section>  
+{% endblock %}

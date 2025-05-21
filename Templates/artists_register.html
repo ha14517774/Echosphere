@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="form-container">
+    <h2>Artist Registration</h2>
+    <form method="POST" action="{{ url_for('artist_register') }}">
+        <input type="text" name="username" placeholder="Artist Name" required>
+        <input type="password" name="password" placeholder="Create a Password" required>
+        <button type="submit">Register as Artist</button>
+    </form>
+    <p>Already registered? <a href="{{ url_for('artist_login') }}">Login here</a></p>
+</section>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="plans-section">
+    <h2>Join the Inner Circle</h2>
+    <p>Access exclusive releases. Support your favorite artists. Be part of the movement.</p>
+
+    <div class="plans-grid">
+        {% if current_user.is_authenticated %}
+            {% if current_user.email.endswith('@drexel.edu') %}
+                <a href="{{ url_for('choose_artists') }}" class="plan-card-link">
+                    <div class="plan-card">
+                        <h3>Inner Circle (Drexel Student)</h3>
+                        <p><strong>Special:</strong> Free for verified Drexel Students</p>
+                        <p>Unlimited early access to new drops.<br>Connect directly with the rising wave.</p>
+                    </div>
+                </a>
+            {% else %}
+                <a href="{{ url_for('choose_artists') }}" class="plan-card-link">
+                    <div class="plan-card">
+                        <h3>Inner Circle (Public)</h3>
+                        <p><strong>Price:</strong> $5/month</p>
+                        <p>Support your favorite artists.<br>Get early exclusive content drops.</p>
+                    </div>
+                </a>
+            {% endif %}
+        {% else %}
+            <div class="plan-card">
+                <h3>Inner Circle (Drexel Student)</h3>
+                <p><strong>Special:</strong> Free for verified Drexel Students</p>
+                <p>Unlimited early access.<br>Connect directly with artists.</p>
+            </div>
+            <div class="plan-card">
+                <h3>Inner Circle (Public)</h3>
+                <p><strong>Price:</strong> $5/month</p>
+                <p>Support the next wave.<br>Exclusive artist drops unlocked.</p>
+            </div>
+            <p>Please <a href="{{ url_for('login') }}">sign in</a> to choose a plan.</p>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-text">
+        <h1>Welcome to Echosphere</h1>
+        <p>Connecting artists and fans like never before.</p>
+        <a class="cta" href="{{ url_for('register') }}">Get in the Circle</a>
+    </div>
+</section>
+
+<section class="about-section">
+  <div class="about-overlay">
+      <h2>What is Echosphere?</h2>
+      <p>Echosphere is a revolutionary platform where artists and fans connect directly. Fans get exclusive early access to music, visuals, and experiences — before the world hears them.</p>
+      <p>Artists regain control, build real fanbases, and thrive with fair, direct support.</p>
+  </div>
+</section>
+<section class="how-it-works-vertical">
+  <div class="vertical-card">
+      <img src="{{ url_for('static', filename='images/connect_vertical.png') }}" alt="Connect">
+      <h3>Connect</h3>
+  </div>
+  <div class="vertical-card">
+      <img src="{{ url_for('static', filename='images/exclusive_vertical.png') }}" alt="Exclusive Access">
+      <h3>Exclusive Access</h3>
+  </div>
+  <div class="vertical-card">
+      <img src="{{ url_for('static', filename='images/support_vertical.png') }}" alt="Support">
+      <h3>Support</h3>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Echosphere</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+        <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    </head>
+
+    <script>
+        function likeMedia(artistId, filename) {
+            fetch(`/like/${artistId}/${filename}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const countSpan = document.getElementById('like-count-' + filename.replace(/\./g, ''));
+                    if (countSpan) {
+                        countSpan.textContent = data.likes;
+                    }
+                }
+            });
+        }
+        </script>
+        
+<body>
+    <header class="navbar">
+        <div class="navbar-content">
+            <div class="left-logo-title">
+                <img class="logo" src="{{ url_for('static', filename='images/logo.png') }}" alt="Echosphere Logo">
+                <span class="site-name">Echosphere</span>
+                <a class="home-link" href="{{ url_for('index') }}">Home</a>
+            </div>
+
+            <div class="moving-banner">
+                <marquee behavior="scroll" direction="left">Be a part of the Echosphere Movement 🚀🖤</marquee>
+            </div>
+
+            <nav>
+                <a href="{{ url_for('all_artists') }}">All Artists</a>
+                {% if current_user.is_authenticated %}
+                    {% if current_user.role == 'artist' %}
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                    {% else %}
+                        <a href="{{ url_for('plans') }}">Plans</a>
+                        <a href="{{ url_for('your_artists') }}">Your Artists</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('plans') }}">Plans</a>
+                    <a href="{{ url_for('login') }}">Sign In</a>
+                    <a class="cta" href="{{ url_for('register') }}">Get in the Circle</a>
+                    <a href="{{ url_for('artist_login') }}">For Artists</a>
+                {% endif %}
+            </nav>
+                   
+        </div>
+    </header>
+
+    <main class="main-content">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('all_artists') }}">All Artists</a>
+            <a href="{{ url_for('plans') }}">Plans</a>
+            <a href="{{ url_for('login') }}">Sign In</a>
+            <a href="{{ url_for('artist_login') }}">For Artists</a>
+            <a href="https://www.linkedin.com/in/harshit-agarwal-3aa901220/" target="_blank">LinkedIn</a>
+        </div>
+        <p>Contact: ha655@drexel.edu | &copy; 2025 Echosphere. All rights reserved.</p>
+    </footer>
+     
+</body>
+</html>

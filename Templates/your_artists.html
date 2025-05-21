@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="your-artists-page">
+    <h2>Your Artists</h2>
+
+    {% if artists %}
+    <div class="artist-grid">
+        {% for artist in artists %}
+        <div class="artist-card">
+            <h3>{{ artist.username }}</h3>
+            <a href="{{ url_for('artist_profile', artist_id=artist._id) }}">View Profile</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        <p>You haven’t subscribed to any artists yet. Go to <a href="{{ url_for('all_artists') }}">All Artists</a> to explore.</p>
+    {% endif %}
+</section>
+{% endblock %}

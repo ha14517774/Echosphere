@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="choose-artists">
+    <h2>Choose Your Favorite Artists</h2>
+    <form method="POST" action="{{ url_for('process_subscription') }}">
+        <div class="artist-grid">
+            {% for artist in artists %}
+    {% if artist._id|string not in current_user.subscribed_artists %}
+        <label>
+            <input type="checkbox" name="selected_artists" value="{{ artist._id }}">
+            {{ artist.username }}
+        </label>
+    {% endif %}
+{% endfor %}
+
+        </div>
+        <button type="submit" class="cta-button">Continue</button>
+    </form>
+</section>
+{% endblock %}

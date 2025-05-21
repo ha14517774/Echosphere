@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="dashboard">
+    <h2>Welcome, {{ current_user.username }}!</h2>
+    <p>Manage your exclusive drops in the Echosphere.</p>
+
+    <div class="dashboard-grid">
+        <!-- INSIGHTS BOX -->
+        <div class="insights-box">
+            <h4> Insights</h4>
+            <p><strong>Total Uploads:</strong> {{ upload_count }}</p>
+            <p><strong>Total Plays:</strong> {{ total_plays }}</p>
+            <p><strong>Total Likes:</strong> {{ total_likes }}</p>
+            <p><strong>Total Comments:</strong> {{ total_comments }}</p>
+            <p><strong>Latest Upload:</strong> {{ latest_upload.strftime('%b %d, %Y %H:%M') if latest_upload else "No uploads yet" }}</p>
+        </div>
+        
+
+        <!-- UPLOAD FORM -->
+        <div class="upload-section">
+            <h3>Upload New Content</h3>
+            <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="upload-form">
+                <input type="text" name="title" placeholder="Title" required>
+                <textarea name="description" placeholder="Short description" required></textarea>
+
+                <label>Upload Main File (audio/video/image)</label>
+                <input type="file" name="file" accept="audio/*,video/*,image/*" required>
+
+                <label>Upload Artwork (optional)</label>
+                <input type="file" name="artwork" accept="image/*">
+
+                <button type="submit">Upload</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- UPLOADED CONTENT -->
+    <section class="media-section">
+        <h3>Your Uploaded Content</h3>
+        <div class="media-grid">
+            {% for media in artist.media %}
+                <div class="media-card">
+                    <div class="media-art">
+                        {% set artwork = media.artwork if media.artwork else 'logo.png' %}
+                        <img src="{{ url_for('uploaded_file', filename=artwork) }}" class="media-artwork">
+                    </div>
+                    <h4>{{ media.title }}</h4>
+                    <p>{{ media.description }}</p>
+                    {% if media.filename.endswith('.mp3') or media.filename.endswith('.wav') %}
+                        <audio controls>
+                            <source src="{{ url_for('uploaded_file', filename=media.filename) }}">
+                        </audio>
+                    {% elif media.filename.endswith('.mp4') %}
+                        <video width="100%" controls>
+                            <source src="{{ url_for('uploaded_file', filename=media.filename) }}">
+                        </video>
+                    {% endif %}
+                </div>
+            {% else %}
+                <p>No uploads yet. Start sharing!</p>
+            {% endfor %}
+        </div>
+    </section>
+</section>
+{% endblock %}

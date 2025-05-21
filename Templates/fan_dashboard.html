@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="dashboard">
+    <h2>Welcome, {{ current_user.username }}!</h2>
+    <p>Discover and connect with artists in the Echosphere.</p>
+
+    <div class="artist-grid">
+        {% for artist in artists %}
+            <div class="artist-card">
+                <h3>{{ artist.username }}</h3>
+                <a href="{{ url_for('artist_profile', artist_id=artist._id) }}">View Artist</a>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
