@@ -1,3 +1,5 @@
+import gridfs
+from flask import send_file  
 from flask import Flask, render_template, redirect, url_for, request, flash, send_from_directory, session
 from flask_pymongo import PyMongo
 from flask_bcrypt import Bcrypt
@@ -8,18 +10,17 @@ from datetime import datetime
 from flask import Flask, render_template, redirect, url_for, request, flash, send_from_directory, session, jsonify
 import os
 
+from config import Config
 app = Flask(__name__)
-app.secret_key = "echosphere_secret_key"
-app.config["MONGO_URI"] = "mongodb://localhost:27017/echosphere"
-app.config['UPLOAD_FOLDER'] = 'uploads/'
+
+app.config.from_object(Config)
+
 
 mongo = PyMongo(app)
+fs = gridfs.GridFS(mongo.db)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
-# Create uploads directory if not exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # User model
 class User(UserMixin):
@@ -242,24 +243,16 @@ def upload():
         flash('Missing required fields.')
         return redirect(url_for('dashboard'))
 
-    media_filename = secure_filename(media_file.filename)
-    media_path = os.path.join(app.config['UPLOAD_FOLDER'], media_filename)
-    media_file.save(media_path)
-
+    media_file_id = fs.put(media_file, filename=secure_filename(media_file.filename))
+    artwork_file_id = None
     if artwork_file and artwork_file.filename != "":
-        artwork_filename = secure_filename(artwork_file.filename)
-        artwork_path = os.path.join(app.config['UPLOAD_FOLDER'], artwork_filename)
-        artwork_file.save(artwork_path)
-    else:
-        artwork_filename = "logo.png"
-
-
+        artwork_file_id = fs.put(artwork_file, filename=secure_filename(artwork_file.filename))
 
     new_media_entry = {
     "title": title,
     "description": description,
-    "filename": media_filename,
-    "artwork": artwork_filename,
+    "media_file_id": media_file_id,
+    "artwork_file_id": artwork_file_id,
     "plays": 0,
     "likes": [],
     "comments": []
@@ -368,6 +361,14 @@ def add_comment(artist_id, filename):
     )
 
     return redirect(request.referrer)
+
+@app.route('/file/<file_id>')
+def get_file(file_id):
+    try:
+        file = fs.get(ObjectId(file_id))
+        return send_file(file, download_name=file.filename)
+    except:
+        return "File not found", 404
 
 
 if __name__ == '__main__':
