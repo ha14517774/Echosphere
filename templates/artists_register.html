@@ -1,13 +1,20 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<section class="form-container">
-    <h2>Artist Registration</h2>
-    <form method="POST" action="{{ url_for('artist_register') }}">
-        <input type="text" name="username" placeholder="Artist Name" required>
-        <input type="password" name="password" placeholder="Create a Password" required>
-        <button type="submit">Register as Artist</button>
-    </form>
-    <p>Already registered? <a href="{{ url_for('artist_login') }}">Login here</a></p>
+<section class="auth-section">
+    <div class="auth-form">
+        <h2>Register as an Artist</h2>
+        <form action="{{ url_for('artist_register') }}" method="POST">
+            <label for="username">Username</label>
+            <input type="text" name="username" required>
+
+            <label for="password">Password</label>
+            <input type="password" name="password" required>
+
+            <button type="submit">Register</button>
+        </form>
+        <p>Already an artist? <a href="{{ url_for('artist_login') }}">Login here</a></p>
+    </div>
 </section>
 {% endblock %}
+

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="form-container">
+    <h2 style="margin-bottom: 25px; text-align: center;">Complete Your Profile</h2>
+    <form method="POST">
+        <input type="text" name="genre" placeholder="Genre (e.g. Indie Pop)" required>
+
+        <textarea name="bio" placeholder="Short Bio" rows="5" style="resize: none;"></textarea>
+
+        <button type="submit">Save Profile</button>
+    </form>
+</div>
+{% endblock %}

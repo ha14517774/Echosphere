@@ -90,6 +90,12 @@ def artist_login():
         user_data = mongo.db.users.find_one({'username': request.form['username'], 'role': 'artist'})
         if user_data and bcrypt.check_password_hash(user_data['password'], request.form['password']):
             login_user(User(user_data))
+
+            # Fetch artist details and check for missing profile info
+            artist_data = mongo.db.artists.find_one({'username': user_data['username']})
+            if not artist_data or not artist_data.get('genre') or not artist_data.get('bio'):
+                return redirect(url_for('complete_profile'))
+
             return redirect(url_for('dashboard'))
         flash('Invalid artist credentials.')
     return render_template('artist_login.html')
@@ -110,16 +116,28 @@ def artist_register():
 def dashboard():
     if current_user.role == 'artist':
         artist = mongo.db.artists.find_one({'username': current_user.username})
-        
         uploads = artist.get('media', [])
+
+        # Extract and attach file extensions for display logic
+        for media in uploads:
+            if media.get("media_file_id"):
+                try:
+                    grid_out = fs.get(media["media_file_id"])
+                    media["media_filename"] = grid_out.filename.lower()
+                except:
+                    media["media_filename"] = ""
+            else:
+                media["media_filename"] = ""
+
         upload_count = len(uploads)
         total_plays = sum(m.get('plays', 0) for m in uploads)
         total_likes = sum(len(m.get('likes', [])) for m in uploads)
         total_comments = sum(len(m.get('comments', [])) for m in uploads)
 
-        # Use real timestamps if available
         timestamps = [m.get('upload_time') for m in uploads if isinstance(m, dict) and 'upload_time' in m]
         latest_upload = max(timestamps) if timestamps else None
+
+        artist['media'] = uploads  # ensure you're assigning the updated media list back
 
         return render_template(
             'artist_dashboard.html',
@@ -133,6 +151,7 @@ def dashboard():
     else:
         artists = mongo.db.artists.find()
         return render_template('fan_dashboard.html', artists=artists)
+
 
 
 @app.route('/uploads/<filename>')
@@ -151,17 +170,30 @@ def artist_profile(artist_id):
         flash('Artist not found.', 'error')
         return redirect(url_for('all_artists'))
 
+    # Inject GridFS filenames
+    for media in artist.get('media', []):
+        if media.get("media_file_id"):
+            try:
+                grid_out = fs.get(media["media_file_id"])
+                media["filename"] = grid_out.filename.lower()  # for playback logic
+            except:
+                media["filename"] = ""
+        else:
+            media["filename"] = ""
+
     # Analytics data
     media_count = len(artist.get('media', []))
     last_upload = max((m.get('upload_time') for m in artist['media'] if m.get('upload_time')), default=None)
     subscriber_count = mongo.db.users.count_documents({'subscribed_artists': str(artist['_id'])})
+    total_likes = sum(len(m.get('likes', [])) for m in artist.get('media', []))
 
     return render_template(
         'artist_profile.html',
         artist=artist,
         subscriber_count=subscriber_count,
         media_count=media_count,
-        last_upload=last_upload
+        last_upload=last_upload,
+        total_likes=total_likes
     )
 
 
@@ -227,6 +259,8 @@ def your_artists():
     
     return render_template('your_artists.html', artists=artists)
 
+import mimetypes
+
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload():
@@ -243,44 +277,44 @@ def upload():
         flash('Missing required fields.')
         return redirect(url_for('dashboard'))
 
-    media_file_id = fs.put(media_file, filename=secure_filename(media_file.filename))
+    from werkzeug.utils import secure_filename
+    from bson import ObjectId
+    import mimetypes
+    from datetime import datetime
+
+    # 🛠️ CHANGED: use .stream instead of raw file object
+    try:
+        media_file_id = fs.put(media_file.stream, filename=secure_filename(media_file.filename))
+    except Exception as e:
+        flash(f'Upload failed: {str(e)}')
+        return redirect(url_for('dashboard'))
+
+    media_type = mimetypes.guess_type(media_file.filename)[0] or "application/octet-stream"
+
     artwork_file_id = None
-    if artwork_file and artwork_file.filename != "":
-        artwork_file_id = fs.put(artwork_file, filename=secure_filename(artwork_file.filename))
+    if artwork_file and artwork_file.filename:
+        try:
+            artwork_file_id = fs.put(artwork_file.stream, filename=secure_filename(artwork_file.filename))
+        except:
+            artwork_file_id = None
 
     new_media_entry = {
-    "title": title,
-    "description": description,
-    "media_file_id": media_file_id,
-    "artwork_file_id": artwork_file_id,
-    "plays": 0,
-    "likes": [],
-    "comments": []
-}
-
-
-    # Check if the media array has old string-format entries and fix them
-    artist = mongo.db.artists.find_one({'username': current_user.username})
-    updated_media = []
-    for item in artist.get('media', []):
-        if isinstance(item, str):
-            updated_media.append({
-                "title": "Untitled",
-                "description": "",
-                "filename": item,
-                "artwork": "",
-                "plays": 0,
-                "likes": [],
-                "comments": []
-            })
-        else:
-            updated_media.append(item)
-
-    updated_media.append(new_media_entry)
+        "_id": ObjectId(),
+        "title": title,
+        "description": description,
+        "filename": secure_filename(media_file.filename),  # ← ADD THIS
+        "media_file_id": media_file_id,
+        "media_type": media_type,
+        "artwork_file_id": artwork_file_id,
+        "plays": 0,
+        "likes": [],
+        "comments": [],
+        "upload_time": datetime.now()
+    }
 
     mongo.db.artists.update_one(
         {'username': current_user.username},
-        {'$set': {'media': updated_media}}
+        {'$push': {'media': new_media_entry}}
     )
 
     flash('Upload successful!')
@@ -344,7 +378,7 @@ def add_comment(artist_id, filename):
         return "Artist not found", 404
 
     for media in artist['media']:
-        if media['filename'] == filename:
+        if media.get('filename') == filename:
             if 'comments' not in media:
                 media['comments'] = []
             media['comments'].append({
@@ -369,6 +403,69 @@ def get_file(file_id):
         return send_file(file, download_name=file.filename)
     except:
         return "File not found", 404
+
+@app.route('/complete_profile', methods=['GET', 'POST'])
+@login_required
+def complete_profile():
+    if current_user.role != 'artist':
+        flash('Only artists need to complete a profile.', 'error')
+        return redirect(url_for('dashboard'))
+
+    artist = mongo.db.artists.find_one({'username': current_user.username})
+
+    # If already filled, redirect to dashboard
+    if artist and artist.get('genre') and artist.get('bio'):
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        genre = request.form['genre']
+        bio = request.form['bio']
+
+        mongo.db.artists.update_one(
+            {'username': current_user.username},
+            {'$set': {'genre': genre, 'bio': bio}}
+        )
+        flash('Profile completed successfully!')
+        return redirect(url_for('dashboard'))
+
+    return render_template('complete_profile.html')
+
+@app.route('/delete_media/<media_id>', methods=['POST'])
+@login_required
+def delete_media(media_id):
+    if current_user.role != 'artist':
+        flash('Only artists can delete media.')
+        return redirect(url_for('dashboard'))
+
+    artist = mongo.db.artists.find_one({'username': current_user.username})
+    if not artist:
+        flash('Artist not found.')
+        return redirect(url_for('dashboard'))
+
+    updated_media = []
+    for media in artist.get('media', []):
+        if str(media.get('_id')) == media_id:
+            # Delete files from GridFS
+            if media.get('media_file_id'):
+                try:
+                    fs.delete(ObjectId(media['media_file_id']))
+                except:
+                    pass
+            if media.get('artwork_file_id'):
+                try:
+                    fs.delete(ObjectId(media['artwork_file_id']))
+                except:
+                    pass
+            continue  # skip adding this media
+        updated_media.append(media)
+
+    mongo.db.artists.update_one(
+        {'username': current_user.username},
+        {'$set': {'media': updated_media}}
+    )
+
+    flash('Media deleted successfully!')
+    return redirect(url_for('dashboard'))
 
 
 if __name__ == '__main__':

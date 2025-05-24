@@ -2,138 +2,126 @@
 
 {% block content %}
 <section class="artist-profile-page">
-    <h2>{{ artist.username }}</h2>
+    <h2 class="username-title">{{ artist.username }}</h2>
+    <p class="desc">Exclusive drops and previews from {{ artist.username }}.</p>
 
-    {% if current_user.is_authenticated and current_user.role == 'artist' and current_user.username == artist.username %}
-        <p>{{ subscriber_count }} fans in the Inner Circle</p>
+    {% set is_owner = current_user.is_authenticated and current_user.username == artist.username %}
+    {% set has_access = is_owner or (current_user.is_authenticated and current_user.email.endswith('@drexel.edu')) %}
+
+    {% if is_owner %}
+        <p class="inner-circle">{{ subscriber_count }} fans in the Inner Circle</p>
     {% endif %}
 
-    <p>Exclusive drops and previews from {{ artist.username }}.</p>
-    <div class="media-grid">
-        {% for item in artist.media %}
-            {% if item.filename %}
-                {% set has_access = current_user.is_authenticated and (
-                    (current_user.role == 'artist' and current_user.username == artist.username) or
-                    (current_user.email is defined and current_user.email.endswith('@drexel.edu')) or
-                    (artist._id|string in current_user.subscribed_artists)
-                ) %}
+    <!-- Media Grid -->
+    <section class="media-section">
+        <h3 class="media-title">Your Uploaded Content</h3>
+        <div class="media-grid">
+        {% for media in artist.media %}
+            {% set file_url = url_for('get_file', file_id=media.media_file_id) %}
+            {% set thumb_url = url_for('get_file', file_id=media.artwork_file_id) if media.artwork_file_id else url_for('static', filename='images/logo.png') %}
+            {% set filename = media.filename %}
+            {% set is_locked = not has_access %}
 
-                <div class="media-card">
-                    <div class="media-art">
-                        {% set artwork = item.artwork if item.artwork and item.artwork != '' else 'logo.png' %}
-                        <img 
-                            src="{{ url_for('uploaded_file', filename=artwork) }}"
-                            class="media-artwork {% if not has_access %}blurred-image{% endif %}">
-                    </div>
+            <div class="media-card">
+                <div class="media-wrapper {% if is_locked %}media-lock-blur{% endif %}">
+                    <img src="{{ thumb_url }}" alt="Thumbnail" class="media-thumbnail">
 
-                    <div class="media-info">
-                        <h3>{{ item.title }}</h3>
-                        <p>{{ item.description }}</p>
+                    {% if filename.endswith('.mp4') %}
+                        <video width="100%" controls {% if is_locked %}muted{% endif %} class="media-content">
+                            <source src="{{ file_url }}" type="video/mp4">
+                        </video>
+                    {% elif filename.endswith('.mp3') or filename.endswith('.wav') or filename.endswith('.m4a') %}
+                        <audio controls {% if is_locked %}muted{% endif %} class="media-content">
+                            <source src="{{ file_url }}">
+                        </audio>
+                    {% elif filename.endswith('.jpg') or filename.endswith('.jpeg') or filename.endswith('.png') or filename.endswith('.gif') %}
+                        <img src="{{ file_url }}" alt="Uploaded image" class="media-content">
+                    {% else %}
+                        <p style="font-size: 0.85rem; color: #aaa;">Unsupported file type</p>
+                    {% endif %}
+                </div>
 
-                        {% if item.filename.endswith('.mp3') or item.filename.endswith('.wav') %}
-                            <audio {% if not has_access %}controls muted preload="none" class="blurred-audio"{% else %}controls{% endif %}>
-                                <source src="{{ url_for('uploaded_file', filename=item.filename) }}">
-                            </audio>
-                        {% elif item.filename.endswith('.mp4') %}
-                            <video width="100%" {% if not has_access %}muted controls class="blurred-video"{% else %}controls{% endif %}>
-                                <source src="{{ url_for('uploaded_file', filename=item.filename) }}">
-                            </video>
+                <!-- These remain unblurred -->
+                <h4>{{ media.title }}</h4>
+                <p>{{ media.description }}</p>
+
+                {% if is_locked %}
+                    <p class="locked">🔒 Subscribe or login with Drexel ID to access this content.</p>
+                {% else %}
+                    <!-- Like -->
+                    <button
+                        id="like-btn-{{ filename|replace('.', '')|replace(' ', '_') }}"
+                        class="like-btn {% if current_user.id in media.likes %}liked{% endif %}"
+                        onclick="likeMedia('{{ artist._id }}', '{{ filename }}')">
+                        {% if current_user.id in media.likes %}💔 Unlike{% else %}❤️ Like{% endif %}
+                    </button>
+                    <p class="like-count">
+                        👍 {{ media.likes | length }} like{{ media.likes | length != 1 and 's' or '' }}
+                    </p>
+
+                    <!-- Comments -->
+                    <form method="POST" action="{{ url_for('add_comment', artist_id=artist._id, filename=filename) }}">
+                        <input type="text" name="comment_text" placeholder="Leave a comment..." required>
+                        <button type="submit">Post</button>
+                    </form>
+
+                    <!-- 🗨️ Show Comments -->
+                    <div class="comment-list">
+                        {% if media.comments %}
+                            {% for comment in media.comments | reverse %}
+                                <div class="comment">
+                                    <strong>{{ comment.username }}</strong>: {{ comment.text }}
+                                    <span class="timestamp">{{ comment.timestamp }}</span>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="no-comments">No comments yet.</p>
                         {% endif %}
-
-                        <div class="like-comment-bar">
-                            {% set safe_id = item.filename|replace('.', '')|replace(' ', '_') %}
-<button
-    id="like-btn-{{ safe_id }}"
-    class="like-btn
-        {% if current_user.is_authenticated and item.likes is iterable and current_user.id in item.likes %}
-            liked
-        {% endif %}"
-    onclick="likeMedia('{{ artist._id }}', '{{ item.filename }}')"
->
-    {% if current_user.is_authenticated and item.likes is iterable and current_user.id in item.likes %}
-        💔 Unlike
-    {% else %}
-        ❤️ Like
-    {% endif %}
-</button>
-<!-- Comments Section -->
-<div class="comments">
-    <form method="POST" action="{{ url_for('add_comment', artist_id=artist._id, filename=item.filename) }}">
-        <input type="text" name="comment_text" placeholder="Leave a comment..." required>
-        <button type="submit">Post</button>
-    </form>
-
-    <div class="comment-list">
-        {% for comment in item.comments | reverse %}
-            <div class="comment">
-                <strong>{{ comment.username }}</strong>: {{ comment.text }}
-                <span class="timestamp">{{ comment.timestamp }}</span>
+                    </div>
+                {% endif %}
             </div>
         {% endfor %}
+        </div>
+    </section>
+
+    <!-- Upload Section (centered) -->
+    {% if is_owner %}
+    <!-- Upload & Insights Centered Wrapper -->
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 40px; margin-top: 60px;">
+
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <h3>Upload New Content</h3>
+            <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="upload-form">
+                <input type="text" name="title" placeholder="Title" required>
+                <textarea name="description" placeholder="Short description" required></textarea>
+
+                <label>Upload Main File (audio/video/image)</label>
+                <input type="file" name="file" accept="audio/*,video/*,image/*" required>
+
+                <label>Upload Artwork (optional)</label>
+                <input type="file" name="artwork" accept="image/*">
+
+                <button type="submit">Upload</button>
+            </form>
+        </section>
+
+        <!-- Insights Section -->
+        <section class="upload-section" style="text-align: center;">
+            <h3>Dashboard Insights</h3>
+            <p><strong>Total Uploads:</strong> {{ media_count }}</p>
+            <p><strong>Total Likes:</strong> {{ total_likes }}</p>
+            <p><strong>Total Subscribers:</strong> {{ subscriber_count }}</p>
+            <p><strong>Last Upload:</strong> {{ last_upload.strftime('%b %d, %Y %I:%M %p') if last_upload else 'N/A' }}</p>
+        </section>
     </div>
-</div>
-
-                        </div>
-                
-                        {% if not has_access %}
-                            <p class="locked">🔒 Subscribe or login with Drexel ID to access this content.</p>
-                        {% endif %}
-                    </div>
-                </div>
-            {% endif %}
-        {% endfor %}
-    </div>
+    {% endif %}
 </section>
 
-{% if current_user.is_authenticated and current_user.username == artist.username %}
-<section class="upload-section">
-    <h3>Upload New Content</h3>
-    <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="upload-form">
-        <input type="text" name="title" placeholder="Title" required>
-        <textarea name="description" placeholder="Short description" required></textarea>
-        
-        <label>Main File (audio/video/image)</label>
-        <input type="file" name="file" accept="audio/*,video/*,image/*" required>
-
-        <label>Artwork (optional)</label>
-        <input type="file" name="artwork" accept="image/*">
-        
-        <button type="submit">Upload</button>
-    </form>
-</section>
-
-{% if current_user.is_authenticated and current_user.username == artist.username %}
-<section class="upload-section">
-    <h3>Upload New Content</h3>
-    <!-- form as before -->
-</section>
-
-<section class="upload-section">
-    <h3>Dashboard Insights</h3>
-    <p><strong>Total Uploads:</strong> {{ media_count }}</p>
-    <p><strong>Total Subscribers:</strong> {{ subscriber_count }}</p>
-    <p><strong>Last Upload:</strong> {{ last_upload.strftime('%b %d, %Y %I:%M %p') if last_upload else 'N/A' }}</p>
-</section>
-{% endif %}
-
-{% endif %}
-<script>
-    document.querySelectorAll('audio, video').forEach(player => {
-        player.addEventListener('play', () => {
-            const filename = player.querySelector('source').getAttribute('src').split('/').pop();
-            const artistId = "{{ artist._id }}";
-    
-            fetch(`/increment_play/${artistId}/${filename}`, {
-                method: 'POST'
-            });
-        }, { once: true }); // only trigger once per load
-    });
-    </script>
- 
+<!-- Script -->
 <script>
     function likeMedia(artistId, filename) {
         const safeId = filename.replace(/\./g, '').replace(/ /g, '_');
-
         fetch('/like', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -141,13 +129,8 @@
         }).then(response => response.json()).then(data => {
             if (data.success) {
                 const btn = document.getElementById('like-btn-' + safeId);
-                if (data.liked) {
-                    btn.textContent = '💔 Unlike';
-                    btn.classList.add('liked');
-                } else {
-                    btn.textContent = '❤️ Like';
-                    btn.classList.remove('liked');
-                }
+                btn.textContent = data.liked ? '💔 Unlike' : '❤️ Like';
+                btn.classList.toggle('liked', data.liked);
             }
         });
     }
