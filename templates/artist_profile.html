@@ -26,10 +26,12 @@
                 <div class="media-wrapper {% if is_locked %}media-lock-blur{% endif %}">
                     <img src="{{ thumb_url }}" alt="Thumbnail" class="media-thumbnail">
 
-                    {% if filename.endswith('.mp4') %}
+                    {% if filename.endswith('.mp4') or filename.endswith('.mov') %}
                         <video width="100%" controls {% if is_locked %}muted{% endif %} class="media-content">
-                            <source src="{{ file_url }}" type="video/mp4">
+                            <source src="{{ file_url }}">
+                            Your browser does not support the video tag.
                         </video>
+
                     {% elif filename.endswith('.mp3') or filename.endswith('.wav') or filename.endswith('.m4a') %}
                         <audio controls {% if is_locked %}muted{% endif %} class="media-content">
                             <source src="{{ file_url }}">
@@ -97,7 +99,7 @@
                 <textarea name="description" placeholder="Short description" required></textarea>
 
                 <label>Upload Main File (audio/video/image)</label>
-                <input type="file" name="file" accept="audio/*,video/*,image/*" required>
+                <input type="file" name="file" accept="audio/*,video/*,image/*,.mov" required>
 
                 <label>Upload Artwork (optional)</label>
                 <input type="file" name="artwork" accept="image/*">
@@ -120,27 +122,26 @@
 
 <script>
 function likeMedia(button, artistId, mediaId) {
-    // Toggle UI immediately
     const btn = button;
-    const isLiked = btn.classList.toggle("liked");
+    const countElem = document.getElementById("like-count-" + mediaId);
 
-    // Update text
+    if (!btn || !countElem) return;
+
+    const isLiked = btn.classList.toggle("liked");
     btn.textContent = isLiked ? "💔 Unlike" : "❤️ Like";
 
-    // Update count locally
-    const countElem = document.getElementById("like-count-" + mediaId);
+    // Update like count visually
     const match = countElem.textContent.match(/\d+/);
     let count = match ? parseInt(match[0]) : 0;
-    count = isLiked ? count + 1 : count - 1;
+    count = isLiked ? count + 1 : Math.max(0, count - 1);
     countElem.textContent = `👍 ${count} like${count !== 1 ? "s" : ""}`;
 
-    // Fire async request (but no need to wait for it)
+    // Non-blocking backend call
     fetch('/like', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ artist_id: artistId, media_id: mediaId })
     }).catch(err => {
-        // Optional: revert UI if request fails (or silently fail)
         console.warn("Backend slow/unavailable:", err);
     });
 }
