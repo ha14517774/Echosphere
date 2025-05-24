@@ -29,6 +29,8 @@ class User(UserMixin):
         self.username = user_data['username']
         self.role = user_data['role']
         self.email = user_data.get('email', '')
+        self.subscribed_artists = user_data.get('subscribed_artists', [])
+
 
 
 @login_manager.user_loader
@@ -244,15 +246,19 @@ def general_confirm():
 @login_required
 def process_subscription():
     selected_artist_ids = request.form.getlist('selected_artists')
-    # Save to the user profile
+
+    # Save selected artists to the user's profile
     mongo.db.users.update_one(
         {'_id': ObjectId(current_user.id)},
         {'$set': {'subscribed_artists': selected_artist_ids}}
     )
 
+    # Optional: store in session if needed
     session['selected_artists'] = selected_artist_ids
-    flash('Artists selected. Proceeding to payment gateway (coming soon)...', 'success')
-    return redirect(url_for('payment_page'))
+
+    flash('Artists selected. Welcome to your Circle!', 'success')
+    return redirect(url_for('your_artists'))
+
 
 
 @app.route('/payment')
@@ -263,15 +269,15 @@ def payment_page():
 @app.route('/your_artists')
 @login_required
 def your_artists():
-    if current_user.email.endswith('@drexel.edu'):
-        # Drexel = access to all artists
-        artists = mongo.db.artists.find()
-    else:
-        # Only show subscribed artists
-        artist_ids = current_user.subscribed_artists if hasattr(current_user, 'subscribed_artists') else []
-        artists = mongo.db.artists.find({'_id': {'$in': [ObjectId(aid) for aid in artist_ids]}})
+    artist_ids = getattr(current_user, 'subscribed_artists', [])
     
+    if not artist_ids:
+        artists = []
+    else:
+        artists = mongo.db.artists.find({'_id': {'$in': [ObjectId(aid) for aid in artist_ids]}})
+
     return render_template('your_artists.html', artists=artists)
+
 
 import mimetypes
 

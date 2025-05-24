@@ -52,10 +52,10 @@
                     <button
                         id="like-btn-{{ media._id }}"
                         class="like-btn {% if current_user.id in media.likes %}liked{% endif %}"
-                        onclick="likeMedia('{{ artist._id }}', '{{ media._id }}')">
+                        onclick="likeMedia(this, '{{ artist._id }}', '{{ media._id }}')">
                         {% if current_user.id in media.likes %}💔 Unlike{% else %}❤️ Like{% endif %}
                     </button>
-                    <p class="like-count">
+                    <p class="like-count" id="like-count-{{ media._id }}">
                         👍 {{ media.likes | length }} like{{ media.likes | length != 1 and 's' or '' }}
                     </p>
 
@@ -118,22 +118,33 @@
     {% endif %}
 </section>
 
-<!-- Script -->
 <script>
-    function likeMedia(artistId, mediaId) {
-        fetch('/like', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ artist_id: artistId, media_id: mediaId })
-        }).then(res => res.json())
-        .then(data => {
-            if (data.success) location.reload();
-        });
-    }
+function likeMedia(button, artistId, mediaId) {
+    // Toggle UI immediately
+    const btn = button;
+    const isLiked = btn.classList.toggle("liked");
 
+    // Update text
+    btn.textContent = isLiked ? "💔 Unlike" : "❤️ Like";
 
+    // Update count locally
+    const countElem = document.getElementById("like-count-" + mediaId);
+    const match = countElem.textContent.match(/\d+/);
+    let count = match ? parseInt(match[0]) : 0;
+    count = isLiked ? count + 1 : count - 1;
+    countElem.textContent = `👍 ${count} like${count !== 1 ? "s" : ""}`;
+
+    // Fire async request (but no need to wait for it)
+    fetch('/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artist_id: artistId, media_id: mediaId })
+    }).catch(err => {
+        // Optional: revert UI if request fails (or silently fail)
+        console.warn("Backend slow/unavailable:", err);
+    });
+}
 </script>
+
 
 {% endblock %}

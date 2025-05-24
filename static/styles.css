@@ -867,3 +867,7 @@ nav a.cta:hover {
     font-size: 0.7rem;
     color: #888;
 }
+
+.like-btn.liked {
+    color: red;
+}
