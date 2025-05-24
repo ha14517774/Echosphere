@@ -50,8 +50,11 @@ def login():
         if user_data and bcrypt.check_password_hash(user_data['password'], request.form['password']):
             login_user(User(user_data))
 
-            # Redirect Drexel users directly to 'your_artists'
+
             if user_data['email'].endswith('@drexel.edu'):
+            # If the user has no subscriptions yet, go to choose_artists
+                if not user_data.get('subscribed_artists'):
+                    return redirect(url_for('choose_artists'))
                 return redirect(url_for('your_artists'))
 
             # General users check if they've already subscribed
@@ -241,10 +244,16 @@ def general_confirm():
 @login_required
 def process_subscription():
     selected_artist_ids = request.form.getlist('selected_artists')
-    session['selected_artists'] = selected_artist_ids
+    # Save to the user profile
+    mongo.db.users.update_one(
+        {'_id': ObjectId(current_user.id)},
+        {'$set': {'subscribed_artists': selected_artist_ids}}
+    )
 
+    session['selected_artists'] = selected_artist_ids
     flash('Artists selected. Proceeding to payment gateway (coming soon)...', 'success')
     return redirect(url_for('payment_page'))
+
 
 @app.route('/payment')
 @login_required
