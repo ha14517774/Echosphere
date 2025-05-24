@@ -50,9 +50,9 @@
                 {% else %}
                     <!-- Like -->
                     <button
-                        id="like-btn-{{ filename|replace('.', '')|replace(' ', '_') }}"
+                        id="like-btn-{{ media._id }}"
                         class="like-btn {% if current_user.id in media.likes %}liked{% endif %}"
-                        onclick="likeMedia('{{ artist._id }}', '{{ filename }}')">
+                        onclick="likeMedia('{{ artist._id }}', '{{ media._id }}')">
                         {% if current_user.id in media.likes %}💔 Unlike{% else %}❤️ Like{% endif %}
                     </button>
                     <p class="like-count">
@@ -60,7 +60,7 @@
                     </p>
 
                     <!-- Comments -->
-                    <form method="POST" action="{{ url_for('add_comment', artist_id=artist._id, filename=filename) }}">
+                    <form method="POST" action="{{ url_for('add_comment', artist_id=artist._id, media_id=media._id) }}">
                         <input type="text" name="comment_text" placeholder="Leave a comment..." required>
                         <button type="submit">Post</button>
                     </form>
@@ -120,20 +120,20 @@
 
 <!-- Script -->
 <script>
-    function likeMedia(artistId, filename) {
-        const safeId = filename.replace(/\./g, '').replace(/ /g, '_');
+    function likeMedia(artistId, mediaId) {
         fetch('/like', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ artist_id: artistId, filename: filename })
-        }).then(response => response.json()).then(data => {
-            if (data.success) {
-                const btn = document.getElementById('like-btn-' + safeId);
-                btn.textContent = data.liked ? '💔 Unlike' : '❤️ Like';
-                btn.classList.toggle('liked', data.liked);
-            }
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ artist_id: artistId, media_id: mediaId })
+        }).then(res => res.json())
+        .then(data => {
+            if (data.success) location.reload();
         });
     }
+
+
 </script>
 
 {% endblock %}

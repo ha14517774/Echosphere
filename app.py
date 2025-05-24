@@ -123,11 +123,16 @@ def dashboard():
             if media.get("media_file_id"):
                 try:
                     grid_out = fs.get(media["media_file_id"])
-                    media["media_filename"] = grid_out.filename.lower()
+                    # Don't overwrite filename if it already exists
+                    if not media.get("filename"):
+                        media["filename"] = grid_out.filename.lower()
+                    if not media.get("media_filename"):
+                        media["media_filename"] = grid_out.filename.lower()
                 except:
-                    media["media_filename"] = ""
+                    media["media_filename"] = media.get("filename", "")
             else:
-                media["media_filename"] = ""
+                media["media_filename"] = media.get("filename", "")
+
 
         upload_count = len(uploads)
         total_plays = sum(m.get('plays', 0) for m in uploads)
@@ -277,14 +282,10 @@ def upload():
         flash('Missing required fields.')
         return redirect(url_for('dashboard'))
 
-    from werkzeug.utils import secure_filename
-    from bson import ObjectId
-    import mimetypes
-    from datetime import datetime
+    filename_cleaned = secure_filename(media_file.filename)
 
-    # 🛠️ CHANGED: use .stream instead of raw file object
     try:
-        media_file_id = fs.put(media_file.stream, filename=secure_filename(media_file.filename))
+        media_file_id = fs.put(media_file.stream, filename=filename_cleaned)
     except Exception as e:
         flash(f'Upload failed: {str(e)}')
         return redirect(url_for('dashboard'))
@@ -302,7 +303,8 @@ def upload():
         "_id": ObjectId(),
         "title": title,
         "description": description,
-        "filename": secure_filename(media_file.filename),  # ← ADD THIS
+        "filename": filename_cleaned,              # <-- permanent, used in likes/comments
+        "media_filename": filename_cleaned,        # <-- optional: used by template
         "media_file_id": media_file_id,
         "media_type": media_type,
         "artwork_file_id": artwork_file_id,
@@ -319,6 +321,7 @@ def upload():
 
     flash('Upload successful!')
     return redirect(url_for('dashboard'))
+
 
 @app.route('/increment_play/<artist_id>/<filename>', methods=['POST'])
 @login_required
@@ -342,7 +345,7 @@ def increment_play(artist_id, filename):
 def like_media():
     data = request.get_json()
     artist_id = data['artist_id']
-    filename = data['filename']
+    media_id = data['media_id']
 
     artist = mongo.db.artists.find_one({'_id': ObjectId(artist_id)})
     if not artist:
@@ -351,10 +354,11 @@ def like_media():
     updated_media = []
     liked = False
     for media in artist['media']:
-        if media.get('filename') == filename:
+        if str(media.get('_id')) == media_id:
+            user_id = str(current_user.id)
             if 'likes' not in media or not isinstance(media['likes'], list):
                 media['likes'] = []
-            user_id = str(current_user.id)
+
             if user_id in media['likes']:
                 media['likes'].remove(user_id)
                 liked = False
@@ -366,9 +370,10 @@ def like_media():
     mongo.db.artists.update_one({'_id': ObjectId(artist_id)}, {'$set': {'media': updated_media}})
     return jsonify(success=True, liked=liked, likes=len(media['likes']))
 
-@app.route('/comment/<artist_id>/<filename>', methods=['POST'])
+
+@app.route('/comment/<artist_id>/<media_id>', methods=['POST'])
 @login_required
-def add_comment(artist_id, filename):
+def add_comment(artist_id, media_id):
     text = request.form.get('comment_text')
     if not text:
         return redirect(request.referrer)
@@ -378,7 +383,7 @@ def add_comment(artist_id, filename):
         return "Artist not found", 404
 
     for media in artist['media']:
-        if media.get('filename') == filename:
+        if str(media.get('_id')) == media_id:
             if 'comments' not in media:
                 media['comments'] = []
             media['comments'].append({
