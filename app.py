@@ -307,10 +307,32 @@ def upload():
         return redirect(url_for('dashboard'))
 
     try:
-        media_upload = cloudinary.uploader.upload_large(
-            media_file.stream,
-            resource_type="video"
-        )
+        file_ext = os.path.splitext(media_file.filename)[1].lower()
+        is_image = file_ext in ['.jpg', '.jpeg', '.png', '.gif']
+        is_audio = file_ext in ['.mp3', '.wav', '.m4a']
+        is_video = file_ext in ['.mp4', '.mov', '.avi']
+
+        try:
+            if is_video:
+                media_upload = cloudinary.uploader.upload_large(
+                    media_file.stream,
+                    resource_type="video"
+                )
+                media_type = "video"
+            elif is_image or is_audio:
+                media_upload = cloudinary.uploader.upload(
+                    media_file,
+                    resource_type="auto"  # auto handles both image & audio
+                )
+                media_type = media_upload["resource_type"]
+            else:
+                flash("Unsupported file type.")
+                return redirect(url_for('dashboard'))
+
+            media_url = media_upload['secure_url']
+        except Exception as e:
+            flash(f'Media upload failed: {str(e)}')
+            return redirect(url_for('dashboard'))
         media_url = media_upload['secure_url']
         media_type = media_upload['resource_type']
     except Exception as e:
