@@ -39,9 +39,9 @@
         <h3>Your Uploaded Content</h3>
         <div class="media-grid">
         {% for media in artist.media %}
-            {% set file_url = url_for('get_file', file_id=media.media_file_id) %}
-            {% set thumb_url = url_for('get_file', file_id=media.artwork_file_id) if media.artwork_file_id else url_for('static', filename='images/logo.png') %}
-            {% set filename = media.media_filename %}
+            {% set file_url = media.media_url %}
+            {% set thumb_url = media.artwork_url if media.artwork_url else url_for('static', filename='images/logo.png') %}
+            {% set filename = media.filename %}
             {% set is_locked = not (current_user.is_authenticated and (current_user.username == artist.username or current_user.email.endswith('@drexel.edu'))) %}
 
             <div class="media-card {% if is_locked %}media-lock-blur{% endif %}">
@@ -73,6 +73,7 @@
                 {% if is_locked %}
                     <p class="locked">🔒 Subscribe or login with Drexel ID to access this content.</p>
                 {% else %}
+                    {% if request.path != '/dashboard' %}
                     <!-- Like -->
                     <button
                         id="like-btn-{{ media._id }}"
@@ -80,6 +81,7 @@
                         onclick="likeMedia('{{ artist._id }}', '{{ media._id }}')">
                         {% if current_user.id in media.likes %}💔 Unlike{% else %}❤️ Like{% endif %}
                     </button>
+                    {% endif %}
 
                     <!-- Comment Form -->
                     <form method="POST" action="{{ url_for('add_comment', artist_id=artist._id, media_id=media._id) }}">

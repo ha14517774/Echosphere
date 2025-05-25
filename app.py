@@ -22,6 +22,16 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
+import cloudinary
+import cloudinary.uploader
+
+cloudinary.config(
+    cloud_name="dkhni2wva",
+    api_key="311794467787697",
+    api_secret="k4Bk1pAMddVblqRzAaGi1W8qXpw"
+)
+
+
 # User model
 class User(UserMixin):
     def __init__(self, user_data):
@@ -128,11 +138,7 @@ def dashboard():
             if media.get("media_file_id"):
                 try:
                     grid_out = fs.get(media["media_file_id"])
-                    # Don't overwrite filename if it already exists
-                    if not media.get("filename"):
-                        media["filename"] = grid_out.filename.lower()
-                    if not media.get("media_filename"):
-                        media["media_filename"] = grid_out.filename.lower()
+                    media["media_filename"] = media.get("filename", "").lower()
                 except:
                     media["media_filename"] = media.get("filename", "")
             else:
@@ -180,22 +186,26 @@ def artist_profile(artist_id):
         flash('Artist not found.', 'error')
         return redirect(url_for('all_artists'))
 
-    # Inject GridFS filenames
-    for media in artist.get('media', []):
+    uploads = artist.get('media', [])
+
+    # 🔁 Copy the same logic from /dashboard for media enrichment
+    for media in uploads:
         if media.get("media_file_id"):
             try:
                 grid_out = fs.get(media["media_file_id"])
-                media["filename"] = grid_out.filename.lower()  # for playback logic
+                media["media_filename"] = media.get("filename", "").lower()
             except:
-                media["filename"] = ""
+                media["media_filename"] = media.get("filename", "")
         else:
-            media["filename"] = ""
+            media["media_filename"] = media.get("filename", "")
 
-    # Analytics data
-    media_count = len(artist.get('media', []))
-    last_upload = max((m.get('upload_time') for m in artist['media'] if m.get('upload_time')), default=None)
+    artist['media'] = uploads  # ✅ Assign back for the Jinja template
+
+    # Analytics
+    media_count = len(uploads)
+    last_upload = max((m.get('upload_time') for m in uploads if m.get('upload_time')), default=None)
     subscriber_count = mongo.db.users.count_documents({'subscribed_artists': str(artist['_id'])})
-    total_likes = sum(len(m.get('likes', [])) for m in artist.get('media', []))
+    total_likes = sum(len(m.get('likes', [])) for m in uploads)
 
     return render_template(
         'artist_profile.html',
@@ -205,7 +215,6 @@ def artist_profile(artist_id):
         last_upload=last_upload,
         total_likes=total_likes
     )
-
 
 @app.route('/plans')
 def plans():
@@ -293,36 +302,37 @@ def upload():
     media_file = request.files['file']
     artwork_file = request.files.get('artwork')
 
-    if not media_file or not title or not description:
-        flash('Missing required fields.')
+    if not media_file or media_file.filename == '':
+        flash("Please upload a valid media file.")
         return redirect(url_for('dashboard'))
-
-    filename_cleaned = secure_filename(media_file.filename)
 
     try:
-        media_file_id = fs.put(media_file.stream, filename=filename_cleaned)
+        media_upload = cloudinary.uploader.upload_large(
+            media_file.stream,
+            resource_type="video"
+        )
+        media_url = media_upload['secure_url']
+        media_type = media_upload['resource_type']
     except Exception as e:
-        flash(f'Upload failed: {str(e)}')
+        flash(f'Video upload failed: {str(e)}')
         return redirect(url_for('dashboard'))
 
-    media_type = mimetypes.guess_type(media_file.filename)[0] or "application/octet-stream"
-
-    artwork_file_id = None
+    artwork_url = None
     if artwork_file and artwork_file.filename:
         try:
-            artwork_file_id = fs.put(artwork_file.stream, filename=secure_filename(artwork_file.filename))
+            artwork_upload = cloudinary.uploader.upload(artwork_file, resource_type="image")
+            artwork_url = artwork_upload['secure_url']
         except:
-            artwork_file_id = None
+            artwork_url = None
 
     new_media_entry = {
         "_id": ObjectId(),
         "title": title,
         "description": description,
-        "filename": filename_cleaned,              # <-- permanent, used in likes/comments
-        "media_filename": filename_cleaned,        # <-- optional: used by template
-        "media_file_id": media_file_id,
+        "filename": media_upload.get('original_filename') + '.' + media_upload.get('format'),
+        "media_url": media_url,
         "media_type": media_type,
-        "artwork_file_id": artwork_file_id,
+        "artwork_url": artwork_url,
         "plays": 0,
         "likes": [],
         "comments": [],
@@ -336,6 +346,7 @@ def upload():
 
     flash('Upload successful!')
     return redirect(url_for('dashboard'))
+
 
 
 @app.route('/increment_play/<artist_id>/<filename>', methods=['POST'])

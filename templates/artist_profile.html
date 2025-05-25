@@ -17,9 +17,9 @@
         <h3 class="media-title">Your Uploaded Content</h3>
         <div class="media-grid">
         {% for media in artist.media %}
-            {% set file_url = url_for('get_file', file_id=media.media_file_id) %}
-            {% set thumb_url = url_for('get_file', file_id=media.artwork_file_id) if media.artwork_file_id else url_for('static', filename='images/logo.png') %}
-            {% set filename = media.filename %}
+            {% set file_url = media.media_url %}
+            {% set thumb_url = media.artwork_url if media.artwork_url else url_for('static', filename='images/logo.png') %}
+            {% set filename = media.media_filename %}
             {% set is_locked = not has_access %}
 
             <div class="media-card">
